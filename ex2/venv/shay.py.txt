@@ -1,0 +1,250 @@
+import sys
+import numpy
+import random
+from scipy import stats
+
+# This is a generic algorithm which holds common funcions.
+class algorithm:
+    # This function predicts the label over a test set and a weight matrix
+    def predict(self, w, testData):
+        predictions = []
+        # go over the test set
+        for index in range(len(testData)):
+            x = testData[index]
+            # predict
+            prediction = numpy.argmax(numpy.dot(w, x))
+            # save the prediction
+            predictions.append(prediction)
+        return predictions
+
+    # This function runs the algo'
+    def runAlgo(self, train_x, train_y, testData):
+        w = self.train(train_x, train_y)
+        predictions = self.predict(w, testData)
+        return predictions
+
+class Perceptron(algorithm):
+    # This function trains the model
+    def train(self,train_x, train_y):
+        length = len(train_x[0])
+        possibleLabelsVals = set(train_y)
+        w = numpy.zeros((len(possibleLabelsVals), length))
+        # number of iterations
+        epochs = 10
+        examplesLen = len(train_x)
+        # learning rate
+        eta = 0.1
+        # train model
+        for e in range(epochs):
+            for index in range(examplesLen):
+                x = train_x[index]  # data
+                y = train_y[index]  # label
+                y_hat = numpy.argmax(numpy.dot(w, x))
+                # update
+                if y != y_hat:
+                    w[int(y), :] = w[int(y), :] + eta * x
+                    w[int(y_hat), :] = w[int(y_hat), :] - eta * x
+            eta /= e + 1
+        return w
+
+class PA(algorithm):
+    # This function trains the model
+    def train(self, train_x, train_y):
+        length = len(train_x[0])
+        possibleLabelsVals = set(train_y)
+        w = numpy.zeros((len(possibleLabelsVals), length))
+        # number of iterations
+        epochs = 10
+        examplesLen = len(train_x)
+        # train model
+        for e in range(epochs):
+            for index in range(examplesLen):
+                x = train_x[index]  # data
+                y = int(train_y[index])  # label
+                y_hat = int(numpy.argmax([numpy.dot(x, w_i) for w_i in w]))
+                tau = self.calculateTau(x,y,w,y_hat)
+                # update
+                if y != y_hat:
+                    w[int(y), :] = w[int(y), :] + tau * x
+                    w[int(y_hat), :] = w[int(y_hat), :] - tau * x
+        return w
+
+    # This function calculate taue
+    def calculateTau(self,x,y,w,y_hat):
+        l_value = max(0,1 - numpy.dot(w[y],x) + numpy.dot(w[y_hat],x))
+        norm_x = (numpy.linalg.norm(x))**2
+        if norm_x == 0:
+            tau = 0
+        else:
+            tau = l_value/(2*norm_x)
+        return tau
+
+class SVM(algorithm):
+    # This function trains the model
+    def train(self, train_x, train_y):
+        length = len(train_x[0])
+        possibleLabelsVals = set(train_y)
+        w = numpy.zeros((len(possibleLabelsVals), length))
+        # number of iterations
+        epochs = 10
+        examplesLen = len(train_x)
+        # learning rate
+        eta = 0.015
+        lamda = 0.2
+        # train model
+        for e in range(epochs):
+            for index in range(examplesLen):
+                x = train_x[index]  # data
+                y = train_y[index]  # label
+                y_hat = numpy.argmax(numpy.dot(w, x))
+                # update
+                if y != y_hat:
+                    w[int(y), :] = (1-eta*lamda)*w[int(y), :] + eta * x
+                    w[int(y_hat), :] = (1-eta*lamda)*w[int(y_hat), :] - eta * x
+                    for index in range(len(possibleLabelsVals)):
+                        if index != y and index != y_hat:
+                            w[index, :] = (1 - eta * lamda) * w[int(index), :]
+                #else:
+                #    for index in range(len(possibleLabelsVals)):
+                #        w[index, :] = (1 - eta * lamda) * w[int(index), :]
+        return w
+
+# This function return an array represent the sex name
+def convertSex(sex_name):
+    returnValue = [0,0,0]
+    if(sex_name == "M"):
+        returnValue[0] = 1
+    elif(sex_name == "F"):
+        returnValue[1] = 1
+    else:
+        returnValue[2] = 1
+    return  returnValue
+
+"""def calculate(arr, train_y_file):
+    counter = 0
+    totalElements = len(arr)
+    with open(train_y_file) as fp:
+        line = fp.readline().replace("\n","")
+        line_index = 0
+        while line:
+            if arr[line_index] == float(line):
+                counter += 1
+            line = fp.readline().replace("\n", "")
+            line_index += 1
+    print(counter/totalElements)
+
+# DELETE
+def calculate2(arr, test_y_list):
+    counter = 0
+    totalElements = len(arr)
+    for i,line in enumerate(test_y_list):
+        if arr[i] == line:
+            counter += 1
+    print(counter/totalElements)
+"""
+# This function reads the training data and normalizing it by cols
+def readTrainData(train_x_file):
+    # read train_x file line by line and save each line as an array (numpy)
+    train_x = []
+    minVal = []
+    maxVal = []
+    with open(train_x_file) as fp:
+        line = fp.readline().replace("\n", "")
+        line_index = 0
+        while line:
+            line_vals = line.split(",")
+            # convert the sex value to a number
+            newLine = convertSex(line_vals[0])
+            newLine.extend(line_vals[1:])
+            train_x.append(numpy.array(newLine).astype(numpy.float))
+            line = fp.readline().replace("\n", "")
+            line_index += 1
+    # normalize the training set
+    train_x = numpy.array(train_x)
+    # transform cols to rows
+    train_x = numpy.transpose(train_x)
+    for i, line in enumerate(train_x):
+        minVal.append(line.min())
+        maxVal.append(line.max())
+        # normalization
+        #train_x[i] = stats.zscore(line)
+        if line.max() != line.min():
+            train_x[i] = (line - line.min()) / (line.max() - line.min())
+
+    train_x = numpy.transpose(train_x)
+    return train_x,minVal,maxVal
+
+def readTestDate(testData, minVal, maxVal):
+    # read test_x file line by line and save each line as an array (numpy)
+    test_x = []
+    with open(testData) as fp:
+        line = fp.readline().replace("\n", "")
+        line_index = 0
+        while line:
+            line_vals = line.split(",")
+            # convert the sex value to a number
+            newLine = convertSex(line_vals[0])
+            newLine.extend(line_vals[1:])
+            test_x.append(numpy.array(newLine).astype(numpy.float))
+            line = fp.readline().replace("\n", "")
+            line_index += 1
+    # normalize the training set
+        test_x = numpy.array(test_x)
+    # transform cols to rows
+        test_x = numpy.transpose(test_x)
+    for i, line in enumerate(test_x):
+        # normalization
+        # train_x[i] = stats.zscore(line)
+        if minVal[i] != maxVal[i]:
+            test_x[i] = (line - minVal[i]) / (maxVal[i] - minVal[i])
+
+    test_x = numpy.transpose(test_x)
+    return test_x
+
+# This function reads the training labels and returns an array of the labels
+def readYData(train_y_file):
+    train_y = []
+    with open(train_y_file) as fp:
+        line = fp.readline().replace("\n", "")
+        line_index = 0
+        while line:
+            train_y.append(float(line))
+            line = fp.readline().replace("\n", "")
+            line_index += 1
+    return train_y
+
+# This is the main function of the app which runs the 3 algo' over the data
+if __name__ == '__main__':
+    # get parameters
+    arguments = sys.argv[1:]
+    train_x_file = arguments[0] # Train
+    train_y_file = arguments[1] # Labels
+    test_x_file = arguments[2]  # Test
+
+    # get the training data
+    train_x,minVal,maxVal = readTrainData(train_x_file)
+    # get the training labels
+    train_y = readYData(train_y_file)
+    # get test data
+    test_x = readTestDate(test_x_file,minVal,maxVal)
+
+    # Perceptron
+    perceptron = Perceptron()
+    predictionsPerceptron = perceptron.runAlgo(train_x,train_y,test_x)
+    #calculate(predictionsPerceptron,"test_y.txt")
+
+    # SVM
+    svm = SVM()
+    predictionsSVM = svm.runAlgo(train_x,train_y,test_x)
+    #calculate(predictionsSVM,"test_y.txt")
+
+    # PA
+    pa = PA()
+    predictionsPa = pa.runAlgo(train_x, train_y, test_x)
+    #calculate(predictionsPa, "test_y.txt")
+
+    for a,b,c in zip(predictionsPerceptron,predictionsSVM,predictionsPa):
+        print("perceptron: {}, svm: {}, pa: {}".format(a,b,c))
+
+
+# DELETE!!!!!!!!!!!
